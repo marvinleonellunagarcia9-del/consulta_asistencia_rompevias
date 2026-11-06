@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CONSULTA DE ASISTENCIA - COMISION DE ROMPEVIAS</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React y ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { -webkit-tap-highlight-color: transparent; background-color: #f8fafc; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col justify-between">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const { useState, useEffect } = React;
+
+        // Misma configuración de Firebase para conectar a la misma base de datos
+        const firebaseConfig = {
+            apiKey: "AIzaSyDJMcdlz1nlUcCynonikWnvQMIPQEVvp2Y",
+            authDomain: "asistencia-d5169.firebaseapp.com",
+            projectId: "asistencia-d5169",
+            storageBucket: "asistencia-d5169.firebasestorage.app",
+            messagingSenderId: "231825021032",
+            appId: "1:231825021032:web:e39fad074e1f7e4454c3dd",
+            measurementId: "G-NP5Z250FVS"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const appId = 'mi-app-propia';
+
+        function App() {
+            const [users, setUsers] = useState([]);
+            const [activities, setActivities] = useState([]);
+            const [attendance, setAttendance] = useState({});
+            const [loading, setLoading] = useState(true);
+            
+            const [dpiInput, setDpiInput] = useState('');
+            const [searchedUser, setSearchedUser] = useState(null);
+            const [hasSearched, setHasSearched] = useState(false);
+
+            useEffect(() => {
+                const unsubUsers = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'users'), (snap) => {
+                    setUsers(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+                });
+
+                const unsubActivities = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'activities'), (snap) => {
+                    setActivities(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+                });
+
+                const unsubAttendance = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'attendance'), (snap) => {
+                    const attData = {};
+                    snap.docs.forEach(d => { attData[d.id] = d.data(); });
+                    setAttendance(attData);
+                    setLoading(false);
+                });
+
+                return () => { unsubUsers(); unsubActivities(); unsubAttendance(); };
+            }, []);
+
+            const handleSearch = (e) => {
+                e.preventDefault();
+                setHasSearched(true);
+                const query = dpiInput.trim().toLowerCase();
+                const found = users.find(u => u.idNumber.toLowerCase() === query || u.fullName.toLowerCase().includes(query));
+                setSearchedUser(found || null);
+            };
+
+            const sortedActivities = [...activities].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            return (
+                <div className="min-h-screen flex flex-col justify-between">
+                    <div>
+                        <header className="bg-blue-600 text-white p-6 shadow-md text-center">
+                            <h1 className="text-xl font-black tracking-wider">COMISION DE ROMPEVIAS</h1>
+                            <p className="text-xs text-blue-100 mt-1">Portal Público de Consulta de Asistencia por DPI</p>
+                        </header>
+
+                        <main className="max-w-md mx-auto p-4 mt-6">
+                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-6">
+                                <h2 className="text-lg font-black text-slate-800 mb-2 text-center">Consulta tu expediente</h2>
+                                <p className="text-xs text-slate-500 text-center mb-4">Ingresa tu número de DPI para verificar tus asistencias y faltas.</p>
+                                
+                                <form onSubmit={handleSearch} className="space-y-3">
+                                    <input 
+                                        type="text" 
+                                        value={dpiInput} 
+                                        onChange={e => setDpiInput(e.target.value)} 
+                                        placeholder="Número de DPI..." 
+                                        className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-center text-slate-800"
+                                        required 
+                                    />
+                                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white p-3.5 rounded-2xl font-bold shadow-lg shadow-blue-500/20 transition">
+                                        {loading ? 'Cargando datos...' : 'Consultar Asistencia'}
+                                    </button>
+                                </form>
+                            </div>
+
+                            {hasSearched && (
+                                !searchedUser ? (
+                                    <div className="bg-rose-50 border border-rose-200 text-rose-700 p-5 rounded-2xl text-center text-sm font-bold">
+                                        No se encontró ningún integrante con ese DPI o nombre. Verifica tus datos.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 text-center">
+                                            <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center font-black text-xl mx-auto mb-3">
+                                                {searchedUser.fullName.substring(0,2).toUpperCase()}
+                                            </div>
+                                            <h3 className="text-xl font-black text-slate-900">{searchedUser.fullName}</h3>
+                                            <p className="text-xs text-slate-400 mt-0.5">DPI: <span className="font-bold text-slate-700">{searchedUser.idNumber}</span></p>
+
+                                            {(() => {
+                                                const totalEvents = sortedActivities.length;
+                                                let attended = 0;
+                                                sortedActivities.forEach(act => {
+                                                    if (attendance[act.id]?.[searchedUser.id]) attended++;
+                                                });
+                                                const pct = totalEvents > 0 ? Math.round((attended / totalEvents) * 100) : 0;
+
+                                                return (
+                                                    <div className="grid grid-cols-3 gap-2 mt-6 pt-6 border-t border-slate-100 text-center">
+                                                        <div className="bg-slate-50 p-3 rounded-2xl">
+                                                            <p className="text-[10px] uppercase font-bold text-slate-400">Total</p>
+                                                            <p className="text-xl font-black text-slate-800">{totalEvents}</p>
+                                                        </div>
+                                                        <div className="bg-emerald-50 p-3 rounded-2xl">
+                                                            <p className="text-[10px] uppercase font-bold text-emerald-600">Asistió</p>
+                                                            <p className="text-xl font-black text-emerald-700">{attended}</p>
+                                                        </div>
+                                                        <div className="bg-blue-50 p-3 rounded-2xl">
+                                                            <p className="text-[10px] uppercase font-bold text-blue-600">Efectividad</p>
+                                                            <p className="text-xl font-black text-blue-700">{pct}%</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+
+                                        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                                            <div className="p-4 bg-slate-50 border-b border-slate-100 text-center">
+                                                <h4 className="font-bold text-slate-700 text-sm">Historial por Actividad</h4>
+                                            </div>
+                                            <div className="divide-y divide-slate-100">
+                                                {sortedActivities.length === 0 ? (
+                                                    <p className="p-6 text-center text-slate-400 text-xs">No hay actividades registradas aún.</p>
+                                                ) : (
+                                                    sortedActivities.map(act => {
+                                                        const isPresent = attendance[act.id]?.[searchedUser.id] || false;
+                                                        return (
+                                                            <div key={act.id} className="p-4 flex justify-between items-center">
+                                                                <div>
+                                                                    <p className="font-bold text-slate-800 text-sm">{act.name}</p>
+                                                                    <p className="text-[11px] text-slate-400">{act.date}</p>
+                                                                </div>
+                                                                <div>
+                                                                    {isPresent ? (
+                                                                        <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-black">Presente</span>
+                                                                    ) : (
+                                                                        <span className="bg-slate-100 text-slate-400 px-3 py-1 rounded-full text-xs font-semibold">Ausente</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            )}
+                        </main>
+                    </div>
+
+                    <footer className="py-6 text-center text-xs text-slate-400">
+                        Desarrollado por <span className="font-bold text-slate-700">Marvin Luna</span> • asistencia-rompevias
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
